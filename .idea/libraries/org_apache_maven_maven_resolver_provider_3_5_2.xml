@@ -1,0 +1,59 @@
+<component name="libraryTable">
+  <library name="org.apache.maven:maven-resolver-provider:3.5.2" type="repository">
+    <properties maven-id="org.apache.maven:maven-resolver-provider:3.5.2" />
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-provider-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-builder-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-interpolation-1.24.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-component-annotations-1.7.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-artifact-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-builder-support-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-repository-metadata-3.5.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-api-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-spi-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-util-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-impl-1.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-utils-3.1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/javax.inject-1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/guava-20.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-lang3-3.5.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-provider-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-builder-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-interpolation-1.24-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-component-annotations-1.7.1-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-artifact-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-builder-support-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-repository-metadata-3.5.2-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-api-1.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-spi-1.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-util-1.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-impl-1.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-utils-3.1.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/javax.inject-1-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/guava-20.0-javadoc.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-lang3-3.5-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-provider-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-model-builder-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-interpolation-1.24-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-component-annotations-1.7.1-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-artifact-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-builder-support-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-repository-metadata-3.5.2-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-api-1.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-spi-1.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-util-1.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/maven-resolver-impl-1.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/plexus-utils-3.1.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/javax.inject-1-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/guava-20.0-sources.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-lang3-3.5-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
