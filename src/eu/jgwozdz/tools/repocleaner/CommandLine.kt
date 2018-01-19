@@ -1,8 +1,13 @@
 package eu.jgwozdz.tools.repocleaner
 
-import java.util.stream.Collectors.toSet
+val BASEDIR = System.getenv("USERPROFILE") + "\\.m2\\repository"
 
-const val BASEDIR = "C:\\Users\\Jakub\\.m2\\repository"
+val FOCUS = System.getProperty("nameToFocus", "jgwozdz")
+
+val focusFilter: (Any) -> Boolean = { it.toString().contains(FOCUS) }
+val filesToKeepFilter = { gav: GAV -> gav.version == "1.1.28-SNAPSHOT" }
+
+val CLEANUP = System.getProperty("cleanUpErrors", "false") == "true"
 
 fun main(args: Array<String>) {
     println("Scanning $BASEDIR...")
@@ -14,56 +19,36 @@ fun main(args: Array<String>) {
     println()
     println("Found ${pomsInRepo.size} *.pom files")
 
-    println("Extracting GAVs...")
-    val artifacts: List<ScannedArtifact> = pomsInRepo.asSequence()
-            .chunked(100)
-            .map { it.map { analyzer.extractGAV(it) } }
-            .onEach { print(".") }
-            .flatten()
-            .toList()
-    println()
-
-    println("Validating GAVs...")
-    artifacts.asSequence()
-            .chunked(100)
-            .onEach { it.forEach { analyzer.validateArtifactFile(it) } }
-            .onEach { print(".") }
-            .flatten()
-            .toList()
-    println()
-
-    println("Reading raw models...")
-    artifacts.asSequence()
-            .chunked(100)
-            .onEach { it.filter { it.status == ScannedArtifact.Status.Validated }.forEach { analyzer.readRawModel(it) } }
-            .onEach { print(".") }
-            .flatten()
-            .toList()
-    println()
-
-    println("Analyzing dependencies...")
-    artifacts.asSequence()
-            .chunked(100)
-            .onEach { it.filter { it.status == ScannedArtifact.Status.Validated }.forEach { analyzer.readDependencies(it) } }
-            .onEach { print(".") }
-            .flatten()
-            .toList()
-    println()
+    val artifacts: List<ScannedArtifact> = analyzer.analyzeAllPoms(pomsInRepo)
 
     artifacts.groupBy { it.status }
             .forEach { status, list -> println("$status: ${list.size}") }
 
+
+    if (CLEANUP) {
+        artifacts
+            .filter { it.status == ScannedArtifact.Status.Failed }
+            .forEach {
+                println("Will try to remove $it")
+                it.pomFile.parentFile.deleteRecursively()
+
+            }
+    }
+
+
     println("Building graph VERTICES...")
-    val vertices: Map<GAV, AnalyzedArtifact> = artifacts
-            .filter { it.status == ScannedArtifact.Status.Analyzed }
-            .map { AnalyzedArtifact(it.gav, it.pomFile, it.artifactDescriptorResult!!, it.rawModel!!) }
+    val analyzedArtifacts = artifacts
+        .filter { it.status == ScannedArtifact.Status.Analyzed }
+        .map { analyzer.extract(it) }
+
+    val vertices: Map<GAV, AnalyzedArtifact> = analyzedArtifacts
             .associateBy { it.gav }
     println("${vertices.size} vertices")
 
     println("Building graph EDGES pass 1 of 4... (dependencies)")
     val directDependencies: Set<Edge> = vertices.asSequence()
             .chunked(100)
-            .map { it.map { (gav, artifact) -> gav to analyzer.collectDependenciesGAVs(artifact).filter { vertices.containsKey(it) } } }
+        .map { it.map { (gav, artifact) -> gav to artifact.directDependencies.filter { vertices.containsKey(it) } } }
             .onEach { print(".") }
             .flatten()
             .flatMap { (gav, dependencies) -> dependencies.map { Edge(gav, it) }.asSequence() }
@@ -75,7 +60,7 @@ fun main(args: Array<String>) {
             .chunked(100)
             .map {
                 it.map { (gav, artifact) ->
-                    gav to findDirectParents(artifact, analyzer, vertices)
+                    gav to artifact.parents
                 }
             }
             .onEach { print(".") }
@@ -84,38 +69,71 @@ fun main(args: Array<String>) {
             .toSet()
     println(" found ${directParents.size} edges")
 
-    println("Building graph EDGES pass 3 of 4... (parents' dependencies)")
-    val parentsDependencies: Set<Edge> = vertices.keys.asSequence()
-            .chunked(100)
-            .map {
-                it.map { gav -> gav to findIndirectParents(gav, directParents) }
-                        .map { (gav: GAV, parents: Set<GAV>) -> gav to parents.flatMap { p -> directDependencies.filter { it.from == p }.map { it.to } } }
-            }
-            .onEach { print(".") }
-            .flatten()
-            .flatMap { (gav, dependencies) -> dependencies.map { Edge(gav, it) }.asSequence() }
-            .toSet()
-    println(" found ${parentsDependencies.size} edges")
-
-    val graphWorker = GraphWorker(vertices, directDependencies + parentsDependencies)
+//    println("Building graph EDGES pass 3 of 4... (parents' dependencies)")
+//    val parentsDependencies: Set<Edge> = vertices.keys.asSequence()
+//            .chunked(100)
+//            .map {
+//                it.map { gav -> gav to findIndirectParents(gav, directParents) }
+//                        .map { (gav: GAV, parents: Set<GAV>) -> gav to parents.flatMap { p -> directDependencies.filter { it.from == p }.map { it.to } } }
+//            }
+//            .onEach { print(".") }
+//            .flatten()
+//            .flatMap { (gav, dependencies) -> dependencies.map { Edge(gav, it) }.asSequence() }
+//            .toSet()
+//    println(" found ${parentsDependencies.size} edges")
+//
+//    val graphWorker = GraphWorker(vertices, directDependencies + parentsDependencies)
+    val graphWorker = GraphWorker(vertices, directDependencies + directParents.map { Edge(it.to, it.from) })
     println("Calculating distances...")
 
     val fullGraph = graphWorker.calculateFullGraph()
 
+    reportGraph(fullGraph)
+
+    println("Multiple versions:")
+    val gavsToCleanup = fullGraph.vertices.keys.filter(focusFilter)
+    val gavsToKeep = fullGraph.vertices.keys.filter(filesToKeepFilter)
+
+    val multipleVersion = gavsToCleanup
+        .groupBy { Pair(it.groupId, it.artifactId) }
+        .mapValues { entry -> entry.value.sortedByDescending { gav -> fullGraph.vertices[gav]?.pomFile?.lastModified() } }
+
+    multipleVersion
+        .forEach { (g, a), u -> println("$g:$a: ${u.map { it.version }}") }
+
+    val allDependencies:Set<GAV> = graphWorker.collectDependencies(fullGraph, gavsToCleanup)
+    val dependenciesToKeep = graphWorker.collectDependencies(fullGraph, gavsToKeep)
+
+    val gavsToDelete = allDependencies - dependenciesToKeep
+
+    println("Want to delete ${gavsToDelete.size} dependencies for ${(gavsToCleanup-gavsToKeep).size} artifacts")
+
+    if (CLEANUP) {
+        gavsToDelete.mapNotNull { fullGraph.vertices[it]?.pomFile }
+            .forEach {
+                println("Will try to remove `$it` with parent dir")
+//                it. parentFile.deleteRecursively()
+
+            }
+    }
+
+
+}
+
+private fun reportGraph(fullGraph: DependenciesGraph) {
     fullGraph.distanceFromRoot.entries.groupBy { it.value }
-            .toSortedMap()
-            .forEach { distance, entries -> println("$distance (${entries.size})") } // : ${entries.map { it.key }}
+        .toSortedMap()
+        .forEach { distance, entries -> println("$distance (${entries.size})") } // : ${entries.map { it.key }}
 
     fullGraph.distanceFromRoot.filterValues { it == 1 }
-            .forEach { println("${it.key}") }
+        .forEach { println("${it.key}") }
 
-    println("jgwozdz distances:")
-    fullGraph.distanceFromRoot.filterKeys { it.toString().contains("jgwozdz") }.forEach { println(it) }
-    println("depends on jgwozdz:")
-    fullGraph.directDependants.filterKeys { it.toString().contains("jgwozdz") }.forEach { println(it) }
-    println("jgwozdz depends on:")
-    fullGraph.directDependencies.filterKeys { it.toString().contains("jgwozdz") }.forEach { println(it) }
-
+    println("$FOCUS distances:")
+    fullGraph.distanceFromRoot.filterKeys(focusFilter).forEach { println(it) }
+    println("depends on $FOCUS:")
+    fullGraph.directDependants.filterKeys(focusFilter).forEach { println(it) }
+    println("$FOCUS depends on:")
+    fullGraph.directDependencies.filterKeys(focusFilter).forEach { println(it) }
 }
 
 private fun findIndirectParents(gav: GAV, allDirectParents: Set<Edge>): Set<GAV> {
@@ -123,7 +141,3 @@ private fun findIndirectParents(gav: GAV, allDirectParents: Set<Edge>): Set<GAV>
     val indirectParents = parents.flatMap { findIndirectParents(it, allDirectParents) }
     return parents.toSet() + indirectParents
 }
-
-private fun findDirectParents(artifact: AnalyzedArtifact, analyzer: Analyzer, vertices: Map<GAV, AnalyzedArtifact>) =
-        analyzer.collectDependantsGAVs(artifact).filter { vertices.containsKey(it) }
-

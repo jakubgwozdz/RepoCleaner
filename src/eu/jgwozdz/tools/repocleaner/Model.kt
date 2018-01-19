@@ -9,7 +9,9 @@ import org.eclipse.aether.resolution.ArtifactDescriptorRequest
 import org.eclipse.aether.resolution.ArtifactDescriptorResult
 import java.io.File
 
-data class GAV(val groupId: String, val artifactId: String, val version: String) {
+data class GAV(val groupId: String, val artifactId: String, val version: String) : Comparable<GAV> {
+    override fun compareTo(other: GAV): Int = this.toString().compareTo(other.toString())
+
     override fun toString(): String {
         return "$groupId:$artifactId:$version"
     }
@@ -50,12 +52,15 @@ data class ScannedArtifact(val gav: GAV, val pomFile: File) {
     fun localArtifactRequest() = LocalArtifactRequest(artifact, null, null)
 
     fun artifactDescriptorRequest() = ArtifactDescriptorRequest(artifact, null, null)
+    fun markAsFailed(problem: String) {
+        status = Status.Failed
+    }
 
 }
 
 data class AnalyzedArtifact(val gav: GAV, val pomFile: File,
-                            val artifactDescriptorResult: ArtifactDescriptorResult,
-                            val rawModel: Model)
+                            val directDependencies: Set<GAV>,
+                            val parents: Set<GAV>)
 
 data class Edge(val from: GAV, val to: GAV)
 

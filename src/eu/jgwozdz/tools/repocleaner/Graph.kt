@@ -24,5 +24,33 @@ class GraphWorker(private val vertices: Map<GAV, AnalyzedArtifact>, private val 
         distanceFromRoot[vertex] = (minimumDependenciesDistance ?: 0) + 1
     }
 
+    fun collectDependencies(fullGraph: DependenciesGraph, gavsToCleanup: Collection<GAV>, collected: Set<GAV> = emptySet()): Set<GAV> {
+        if (gavsToCleanup.isEmpty()) return emptySet()
+
+//        report("gavsToCleanup", gavsToCleanup)
+//        report("collected", collected)
+//
+        val result =  gavsToCleanup.toSet()
+//        report("result", result)
+
+        val dependencies = gavsToCleanup.flatMap { fullGraph.directDependencies[it].orEmpty() }.toSet()
+//        report("dependencies", dependencies)
+
+        val gavsToCleanup1 = dependencies - collected
+//        report("gavsToCleanup1", gavsToCleanup1)
+
+        val collected1 = collected + result
+//        report("collected1", collected1)
+
+        val result1 = result + collectDependencies(fullGraph, gavsToCleanup1, collected1)
+//        report("result1", result1)
+
+        return result1
+    }
+
+    private fun report(name: String, set: Collection<GAV>) {
+        println("$name: ${set.size} elements: ${set.sortedBy { it -> it }.take(10)}")
+    }
+
 }
 

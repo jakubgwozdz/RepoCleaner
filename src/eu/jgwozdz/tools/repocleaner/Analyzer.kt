@@ -1,5 +1,6 @@
 package eu.jgwozdz.tools.repocleaner
 
+import org.apache.maven.model.Model
 import org.apache.maven.model.building.DefaultModelBuilderFactory
 import org.apache.maven.model.building.ModelBuilder
 import org.apache.maven.model.building.ModelBuildingRequest
@@ -9,6 +10,8 @@ import org.eclipse.aether.impl.ArtifactDescriptorReader
 import org.eclipse.aether.impl.DefaultServiceLocator
 import org.eclipse.aether.internal.impl.SimpleLocalRepositoryManagerFactory
 import org.eclipse.aether.repository.LocalRepository
+import org.eclipse.aether.repository.RepositoryPolicy.UPDATE_POLICY_NEVER
+import org.eclipse.aether.resolution.ArtifactDescriptorResult
 import java.io.File
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -40,6 +43,7 @@ class Analyzer(pathToRepo: String) {
         val localRepository = LocalRepository(baseDirPath.toFile())
 
         session.localRepositoryManager = SimpleLocalRepositoryManagerFactory().newInstance(session, localRepository)
+        session.updatePolicy = UPDATE_POLICY_NEVER
         session.setReadOnly()
 
         descriptorReader = serviceLocator.getService(ArtifactDescriptorReader::class.java)
@@ -76,15 +80,28 @@ class Analyzer(pathToRepo: String) {
     }
 
     fun readDependencies(scannedArtifact: ScannedArtifact) {
-        val artifactDescriptorResult = descriptorReader.readArtifactDescriptor(session, scannedArtifact.artifactDescriptorRequest())
-        scannedArtifact.addDescriptor(artifactDescriptorResult)
+        try {
+            val artifactDescriptorResult = descriptorReader.readArtifactDescriptor(session, scannedArtifact.artifactDescriptorRequest())
+            scannedArtifact.addDescriptor(artifactDescriptorResult)
+        } catch (e: Exception) {
+            var t = e as Throwable
+            val s = mutableListOf(t)
+            while (t.cause != null && !s.contains(t.cause!!)) {
+                t = t.cause!!
+                s.add(t)
+            }
+            val messagesConcatenation = s.map { it.message }
+
+            println("While reading ${scannedArtifact.gav}, this happened: $messagesConcatenation")
+            scannedArtifact.markAsFailed(e.toString())
+        }
     }
 
-    fun collectDependenciesGAVs(analyzedArtifact: AnalyzedArtifact): Set<GAV> {
-        val directDependencies: Iterable<GAV> = analyzedArtifact.artifactDescriptorResult.dependencies.orEmpty()
+    fun collectDependenciesGAVs(artifactDescriptorResult: ArtifactDescriptorResult): Set<GAV> {
+        val directDependencies: Iterable<GAV> = artifactDescriptorResult.dependencies.orEmpty()
                 .mapNotNull { it.artifact }
                 .map { GAV(it.groupId, it.artifactId, it.version) }
-        val managedDependencies: Iterable<GAV> = analyzedArtifact.artifactDescriptorResult.managedDependencies.orEmpty()
+        val managedDependencies: Iterable<GAV> = artifactDescriptorResult.managedDependencies.orEmpty()
                 .mapNotNull { it.artifact }
                 .map { GAV(it.groupId, it.artifactId, it.version) }
 
@@ -94,11 +111,60 @@ class Analyzer(pathToRepo: String) {
     /**
      * returns set of GAVs that depends on artifact. currently it is parent only
      */
-    fun collectDependantsGAVs(analyzedArtifact: AnalyzedArtifact): Set<GAV> {
+    fun collectDependantsGAVs(rawModel: Model): Set<GAV> {
 
-        val parent: GAV? = analyzedArtifact.rawModel.parent?.let { GAV(it.groupId, it.artifactId, it.version) }
+        val parent: GAV? = rawModel.parent?.let { GAV(it.groupId, it.artifactId, it.version) }
 
         return parent?.let { setOf(it) }.orEmpty()
     }
 
+    fun analyzeAllPoms(pomsInRepo: List<File>): List<ScannedArtifact> {
+        println("Extracting GAVs...")
+        val artifacts: List<ScannedArtifact> = pomsInRepo.asSequence()
+            .chunked(100)
+            .map { it.map { extractGAV(it) } }
+            .onEach { print(".") }
+            .flatten()
+            .toList()
+        println()
+
+        println("Validating GAVs...")
+        artifacts.asSequence()
+            .chunked(100)
+            .onEach { it.forEach { validateArtifactFile(it) } }
+            .onEach { print(".") }
+            .flatten()
+            .toList()
+        println()
+
+        println("Reading raw models...")
+        artifacts.asSequence()
+            .chunked(100)
+            .onEach { it.filter { it.status == ScannedArtifact.Status.Validated }.forEach { readRawModel(it) } }
+            .onEach { print(".") }
+            .flatten()
+            .toList()
+        println()
+
+        println("Analyzing dependencies...")
+        artifacts.asSequence()
+            .chunked(100)
+            .onEach { it.filter { it.status == ScannedArtifact.Status.Validated }.forEach { readDependencies(it) } }
+            .onEach { print(".") }
+            .flatten()
+            .toList()
+        println()
+
+        return artifacts
+    }
+
+    fun extract(scannedArtifact: ScannedArtifact): AnalyzedArtifact {
+        if (scannedArtifact.status != ScannedArtifact.Status.Analyzed) throw IllegalStateException("$scannedArtifact not `Analyzed`")
+        val artifactDescriptorResult = scannedArtifact.artifactDescriptorResult ?: throw IllegalStateException("$scannedArtifact artifactDescriptorResult == null")
+        val rawModel = scannedArtifact.rawModel ?: throw IllegalStateException("$scannedArtifact rawModel == null")
+
+        return AnalyzedArtifact(scannedArtifact.gav, scannedArtifact.pomFile,
+            collectDependenciesGAVs(artifactDescriptorResult), collectDependantsGAVs(rawModel))
+    }
 }
+
